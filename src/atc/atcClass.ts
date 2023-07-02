@@ -1,26 +1,30 @@
 import { client } from "../index";
 import { AudioPlayerStatus, PlayerSubscription, StreamType, VoiceConnectionStatus, createAudioPlayer, createAudioResource, entersState, joinVoiceChannel } from "@discordjs/voice";
-import { Guild, Message, TextChannel, VoiceBasedChannel } from "discord.js";
+import { Guild, GuildMember, Message, TextChannel, VoiceBasedChannel } from "discord.js";
 import { atcType } from "./search";
 import { makeButton } from "../config/config";
 
 export class Atc {
   guild: Guild;
   playing: boolean;
+  firstMessage: Message | undefined;
   message: Message | undefined;
   nowSubscription: PlayerSubscription | undefined;
   textChannel: TextChannel | undefined;
   voiceChannel: VoiceBasedChannel | undefined;
   atcData: atcType | undefined;
+  member: GuildMember | undefined;
 
   constructor(guild: Guild) {
     this.guild = guild;
     this.playing = false;
+    this.firstMessage = undefined;
     this.message = undefined;
     this.nowSubscription = undefined;
     this.textChannel = undefined;
     this.voiceChannel = undefined;
     this.atcData = undefined;
+    this.member = undefined;
   }
 
   stop(data: { disConnect?: boolean; msgDelete?: boolean }) {
@@ -30,17 +34,28 @@ export class Atc {
       this.nowSubscription?.connection.disconnect();
       this.nowSubscription?.connection.destroy();
     }
+    this.firstMessage?.delete().catch(() => {});
     if (data.msgDelete) this.message?.delete().catch(() => {});
 
+    this.firstMessage = undefined;
     this.message = undefined;
     this.nowSubscription = undefined;
     this.textChannel = undefined;
     this.voiceChannel = undefined;
     this.atcData = undefined;
+    this.member = undefined;
   }
 
   setVoiceChannel(voiceChannel: VoiceBasedChannel) {
     this.voiceChannel = voiceChannel;
+  }
+
+  setMember(member: GuildMember) {
+    this.member = member;
+  }
+
+  setFirstMessage(firstMessage: Message | undefined) {
+    this.firstMessage = firstMessage;
   }
 
   setMsg(data: { pause?: boolean }) {
@@ -69,7 +84,7 @@ export class Atc {
     this.nowSubscription?.player.stop();
     
     const resource = createAudioResource(this.atcData.url, { inlineVolume: true, inputType: StreamType.Arbitrary });
-    resource.volume?.setVolume(0.7);
+    resource.volume?.setVolume(1);
 
     const connection = joinVoiceChannel({
       channelId: this.voiceChannel.id,
@@ -141,7 +156,7 @@ export class Atc {
       entersState(this.nowSubscription.connection, VoiceConnectionStatus.Ready, 30_000).catch(() => {});
     } else if (this.atcData && this.nowSubscription) {
       const resource = createAudioResource(this.atcData.url, { inlineVolume: true, inputType: StreamType.Arbitrary });
-      resource.volume?.setVolume(0.7);
+      resource.volume?.setVolume(1);
       this.nowSubscription.player.play(resource);
       this.setMsg({ pause: false });
     } else {

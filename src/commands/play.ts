@@ -28,17 +28,34 @@ export default class implements Command {
   /** 실행되는 부분 */
   async slashRun(interaction: CommandInteraction) {
     const cmd = interaction.options.data[0];
-    const data = cmd.options ? cmd.options[0]?.value : undefined;
-    return await interaction.followUp(await this.search((data as string).toUpperCase()));
+    const atc = client.getAtc(interaction.guild!);
+    atc.setMember(interaction.member as GuildMember);
+    if (atc.firstMessage) atc.firstMessage.delete().catch(() => {});
+    atc.setFirstMessage(undefined);
+    return await interaction.followUp(await this.search((cmd.value as string).toUpperCase()));
   }
   async messageRun(message: Message, args: string[]) {
     if (!args[0]) return message.channel.send({ embeds: [ client.mkembed({
       title: `${client.prefix}play [code]`,
       color: "DarkRed"
     }) ] }).then(m => client.msgdelete(m, 1));
-    return message.channel.send(await this.search(args[0].toUpperCase())).then(m => client.msgdelete(m, 5));
+    const atc = client.getAtc(message.guild!);
+    atc.setMember(message.member as GuildMember);
+    return message.channel.send(await this.search(args[0].toUpperCase())).then(m => {
+      atc.setFirstMessage(m);
+      client.msgdelete(m, 5);
+    });
   }
   async menuRun(interaction: StringSelectMenuInteraction, args: string[]) {
+    const atc = client.getAtc(interaction.guild!);
+    if (atc.playing) return interaction.followUp({ embeds: [ client.mkembed({
+      title: `현재 ${atc.atcData?.name || "라디오가"} 재생되고있습니다.`,
+      color: "DarkRed"
+    }) ], ephemeral: true });
+    if (atc.member?.id && (atc.member.id !== interaction.member?.user.id)) return interaction.followUp({ embeds: [ client.mkembed({
+      title: `${atc.member.nickname || atc.member.user.username} 님만 상호작용할수있습니다.`,
+      color: "DarkRed"
+    }) ], ephemeral: true });
     if (!args[0] || args[0].startsWith("none")) return interaction.followUp({ embeds: [ client.mkembed({
       title: `현재 "DOWN"상태입니다.`,
       color: "DarkRed"
@@ -53,7 +70,6 @@ export default class implements Command {
       title: `음성채널에 들어간다음 사용해주세요.`,
       color: "DarkRed"
     }) ], ephemeral: true });
-    const atc = client.getAtc(interaction.guild!);
     const [ url, code ] = args[0].split("#");
     const { list, err } = await search(code.toUpperCase());
     if (!list || err) return interaction.followUp({ embeds: [ client.mkembed({
@@ -66,7 +82,7 @@ export default class implements Command {
       color: "DarkRed"
     }) ], ephemeral: true });
     atc.play({ atcData: get[0], textChannel: textChannel, voiceChannel: voiceChannel });
-    interaction.deferUpdate({ fetchReply: false }).catch(() => {});
+    await interaction.deferUpdate({ fetchReply: false }).catch(() => {});
     return;
   }
 
